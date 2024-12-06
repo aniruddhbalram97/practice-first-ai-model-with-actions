@@ -7,40 +7,51 @@ from datetime import datetime
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 4, kernel_size=3, padding=1)  # 28x28x4
-        self.bn1 = nn.BatchNorm2d(4)
-        self.conv2 = nn.Conv2d(4, 8, kernel_size=3, padding=1)  # 28x28x8
-        self.bn2 = nn.BatchNorm2d(8)
-        self.pool = nn.MaxPool2d(2, 2)  # 14x14x8
+        # Efficient feature extraction
+        self.conv1 = nn.Conv2d(1, 8, kernel_size=5)  # 24x24x8
+        self.bn1 = nn.BatchNorm2d(8)
         
-        self.conv3 = nn.Conv2d(8, 12, kernel_size=3, padding=1)  # 14x14x12
-        self.bn3 = nn.BatchNorm2d(12)
-        self.conv4 = nn.Conv2d(12, 16, kernel_size=3, padding=1)  # 14x14x16
-        self.bn4 = nn.BatchNorm2d(16)
-        self.pool2 = nn.MaxPool2d(2, 2)  # 7x7x16
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=5)  # 20x20x16
+        self.bn2 = nn.BatchNorm2d(16)
         
-        self.fc1 = nn.Linear(16 * 7 * 7, 24)
-        self.fc2 = nn.Linear(24, 10)
+        self.conv3 = nn.Conv2d(16, 32, kernel_size=5)  # 16x16x32
+        self.bn3 = nn.BatchNorm2d(32)
+        
+        # Global pooling to reduce parameters
+        self.global_pool = nn.AdaptiveAvgPool2d(4)  # 4x4x32
+        
+        # Simple classifier
+        self.fc = nn.Linear(32 * 4 * 4, 10)
+        
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.2)
-
+        self.dropout = nn.Dropout(0.1)
+        
     def forward(self, x):
-        x = self.relu(self.bn1(self.conv1(x)))
-        x = self.relu(self.bn2(self.conv2(x)))
-        x = self.pool(x)
+        # Deep feature extraction without pooling layers
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
         
-        x = self.relu(self.bn3(self.conv3(x)))
-        x = self.relu(self.bn4(self.conv4(x)))
-        x = self.pool2(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu(x)
+        x = self.dropout(x)
         
-        x = x.view(-1, 16 * 7 * 7)
-        x = self.dropout(self.relu(self.fc1(x)))
-        x = self.fc2(x)
+        x = self.conv3(x)
+        x = self.bn3(x)
+        x = self.relu(x)
+        
+        # Global pooling and classification
+        x = self.global_pool(x)
+        x = x.view(-1, 32 * 4 * 4)
+        x = self.dropout(x)
+        x = self.fc(x)
         return x
 
 def train_model():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
+    # Minimal augmentation for faster convergence
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.RandomAffine(
@@ -48,14 +59,13 @@ def train_model():
             translate=(0.05, 0.05),
             scale=(0.95, 1.05)
         ),
-        transforms.RandomErasing(p=0.1, scale=(0.02, 0.1)),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
     
     train_dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
     train_loader = torch.utils.data.DataLoader(
         train_dataset, 
-        batch_size=128,
+        batch_size=64,
         shuffle=True,
         num_workers=2,
         pin_memory=True
@@ -64,10 +74,11 @@ def train_model():
     model = SimpleCNN().to(device)
     criterion = nn.CrossEntropyLoss()
     
+    # Optimized training parameters
     optimizer = optim.AdamW(
         model.parameters(),
-        lr=0.001,
-        weight_decay=0.01,
+        lr=0.0005,
+        weight_decay=0.0001,
         betas=(0.9, 0.999)
     )
     
@@ -75,12 +86,12 @@ def train_model():
     
     scheduler = optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr=0.003,
+        max_lr=0.002,
         steps_per_epoch=total_steps,
         epochs=1,
-        pct_start=0.2,
-        div_factor=10,
-        final_div_factor=100,
+        pct_start=0.1,
+        div_factor=25,
+        final_div_factor=1000,
         anneal_strategy='cos'
     )
     
