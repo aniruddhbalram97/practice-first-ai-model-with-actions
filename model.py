@@ -10,15 +10,18 @@ class SimpleCNN(nn.Module):
         self.conv1 = nn.Conv2d(1, 8, kernel_size=3)  # 26x26x8
         self.conv2 = nn.Conv2d(8, 16, kernel_size=3)  # 24x24x16
         self.pool = nn.MaxPool2d(2, 2)  # 12x12x16
-        self.fc1 = nn.Linear(16 * 12 * 12, 128)
-        self.fc2 = nn.Linear(128, 10)
+        self.pool2 = nn.MaxPool2d(2, 2)  # 6x6x16
+        self.fc1 = nn.Linear(16 * 6 * 6, 32)
+        self.fc2 = nn.Linear(32, 10)
         self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.2)
 
     def forward(self, x):
         x = self.relu(self.conv1(x))
         x = self.pool(self.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 12 * 12)
-        x = self.relu(self.fc1(x))
+        x = self.pool2(x)
+        x = x.view(-1, 16 * 6 * 6)
+        x = self.dropout(self.relu(self.fc1(x)))
         x = self.fc2(x)
         return x
 
