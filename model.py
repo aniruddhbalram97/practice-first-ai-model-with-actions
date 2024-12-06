@@ -8,10 +8,10 @@ class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
         # Efficient feature extraction
-        self.conv1 = nn.Conv2d(1, 8, kernel_size=5)  # 24x24x8
-        self.bn1 = nn.BatchNorm2d(8)
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=5)  # 24x24x8
+        self.bn1 = nn.BatchNorm2d(16)
         
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=5)  # 20x20x16
+        self.conv2 = nn.Conv2d(16, 16, kernel_size=5)  # 20x20x16
         self.bn2 = nn.BatchNorm2d(16)
         
         self.conv3 = nn.Conv2d(16, 32, kernel_size=5)  # 16x16x32
@@ -51,7 +51,6 @@ class SimpleCNN(nn.Module):
 def train_model():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # Minimal augmentation for faster convergence
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.RandomAffine(
@@ -74,25 +73,11 @@ def train_model():
     model = SimpleCNN().to(device)
     criterion = nn.CrossEntropyLoss()
     
-    # Optimized training parameters
     optimizer = optim.AdamW(
         model.parameters(),
-        lr=0.0005,
+        lr=0.001,  # Slightly increased learning rate
         weight_decay=0.0001,
         betas=(0.9, 0.999)
-    )
-    
-    total_steps = len(train_loader)
-    
-    scheduler = optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=0.002,
-        steps_per_epoch=total_steps,
-        epochs=1,
-        pct_start=0.1,
-        div_factor=25,
-        final_div_factor=1000,
-        anneal_strategy='cos'
     )
     
     model.train()
@@ -107,11 +92,7 @@ def train_model():
         output = model(data)
         loss = criterion(output, target)
         loss.backward()
-        
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        
         optimizer.step()
-        scheduler.step()
         
         _, predicted = output.max(1)
         total += target.size(0)
@@ -123,8 +104,7 @@ def train_model():
         if batch_idx % 50 == 0:
             print(f'Batch [{batch_idx}/{len(train_loader)}], '
                   f'Loss: {running_loss/50:.4f}, '
-                  f'Accuracy: {current_acc:.2f}%, '
-                  f'LR: {scheduler.get_last_lr()[0]:.6f}')
+                  f'Accuracy: {current_acc:.2f}%')
             running_loss = 0.0
     
     accuracy = 100. * correct / total
