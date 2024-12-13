@@ -31,5 +31,10 @@ def test_model_accuracy():
     accuracy, _ = train_model()
     assert accuracy >= 95.0, f"Model accuracy {accuracy:.2f}% is less than required 95%"
 
+def test_relu_usage():
+    model = SimpleCNN()
+    relu_count = sum(isinstance(layer, torch.nn.ReLU) for layer in model.modules())
+    assert relu_count > 0, "ReLU activation function is not used in the model"
+
 if __name__ == "__main__":
     pytest.main([__file__]) 
